@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spinning Cube</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            perspective: 1000px;
+            overflow: hidden;
+        }
+
+        .cube-container {
+            width: 200px;
+            height: 200px;
+            position: relative;
+            transform-style: preserve-3d;
+            animation: rotateCube 8s infinite linear;
+        }
+
+        @keyframes rotateCube {
+            0% {
+                transform: rotateX(0deg) rotateY(0deg);
+            }
+            100% {
+                transform: rotateX(360deg) rotateY(360deg);
+            }
+        }
+
+        .cube-face {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-family: 'Arial', sans-serif;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .front {
+            transform: translateZ(100px);
+            background: rgba(255, 107, 107, 0.3);
+        }
+
+        .back {
+            transform: rotateY(180deg) translateZ(100px);
+            background: rgba(72, 219, 251, 0.3);
+        }
+
+        .right {
+            transform: rotateY(90deg) translateZ(100px);
+            background: rgba(255, 234, 167, 0.3);
+        }
+
+        .left {
+            transform: rotateY(-90deg) translateZ(100px);
+            background: rgba(162, 155, 254, 0.3);
+        }
+
+        .top {
+            transform: rotateX(90deg) translateZ(100px);
+            background: rgba(85, 239, 196, 0.3);
+        }
+
+        .bottom {
+            transform: rotateX(-90deg) translateZ(100px);
+            background: rgba(255, 159, 243, 0.3);
+        }
+
+        .title {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-family: 'Arial', sans-serif;
+            font-size: 36px;
+            font-weight: bold;
+            text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <h1 class="title">Spinning Cube</h1>
+    <div class="cube-container">
+        <div class="cube-face front">Front</div>
+        <div class="cube-face back">Back</div>
+        <div class="cube-face right">Right</div>
+        <div class="cube-face left">Left</div>
+        <div class="cube-face top">Top</div>
+        <div class="cube-face bottom">Bottom</div>
+    </div>
+</body>
+</html>
+
