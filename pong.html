@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PONG // Retro</title>
+    <style>
+        /* Base reset */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* Color scheme: black & white only */
+        :root {
+            --bg: #0a0a0a;
+            --fg: #f5f5f5;
+            --dim: #cfcfcf;
+            --mid: #aaaaaa;
+        }
+
+        html, body {
+            height: 100%;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            letter-spacing: 0.03em;
+        }
+
+        /* Container */
+        .frame {
+            height: 100vh;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            place-items: center;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Subtle vignette + scanlines for retro feel */
+        .frame::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.75) 70%);
+            pointer-events: none;
+            mix-blend-mode: overlay;
+        }
+        .frame::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                to bottom,
+                rgba(255,255,255,0.035) 0px,
+                rgba(255,255,255,0.035) 1px,
+                rgba(0,0,0,0) 2px,
+                rgba(0,0,0,0) 3px
+            );
+            opacity: 0.35;
+            pointer-events: none;
+        }
+
+        /* Header */
+        .title {
+            font-size: clamp(18px, 2.6vw, 28px);
+            color: var(--fg);
+            text-transform: uppercase;
+            word-spacing: 0.25em;
+            opacity: 0.95;
+        }
+        .sub {
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--mid);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        /* Game area */
+        .game-wrap {
+            width: min(92vw, 820px);
+            aspect-ratio: 16/9;
+            border: 2px solid var(--fg);
+            position: relative;
+            box-shadow: 0 0 0 6px rgba(255,255,255,0.05), inset 0 0 80px rgba(255,255,255,0.03);
+            outline: 1px solid rgba(255,255,255,0.1);
+            background: repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0 2px, transparent 2px 4px);
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+            display: block;
+        }
+
+        /* HUD */
+        .hud {
+            margin-top: 14px;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            color: var(--dim);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+        }
+        .dot { width: 4px; height: 4px; background: var(--dim); display: inline-block; }
+        .btn {
+            border: 1px solid var(--dim);
+            color: var(--fg);
+            background: transparent;
+            padding: 8px 12px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: 120ms ease-in-out;
+        }
+        .btn:hover { filter: brightness(1.15); }
+        .btn:active { transform: translateY(1px); }
+
+        /* Score */
+        .score {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 10px;
+            border: 1px solid var(--dim);
+            border-radius: 2px;
+        }
+
+        /* Center line */
+        .center-line {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: repeating-linear-gradient(
+                to bottom,
+                var(--dim) 0 16px,
+                rgba(0,0,0,0) 16px 28px
+            );
+            transform: translateX(-50%);
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* Toast */
+        .toast {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 10px;
+            color: var(--mid);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            padding: 6px 8px;
+            border: 1px dashed var(--mid);
+            opacity: 0.8;
+            backdrop-filter: blur(2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="frame">
+        <header>
+            <div class="title">P O N G</div>
+            <div class="sub">Black & White // Minimal Retro</div>
+        </header>
+
+        <main class="game-wrap">
+            <div class="center-line"></div>
+            <canvas id="game" width="410" height="230" aria-label="Retro Pong"></canvas>
+            <div class="toast" id="toast">W/S or ↑/↓ to play</div>
+        </main>
+
+        <footer class="hud">
+            <div class="score"><span id="p1">0</span> <span class="dot"></span> <span id="p2">0</span></div>
+            <button class="btn" id="restart">Restart</button>
+            <span>Mode: <strong id="mode">Classic</strong></span>
+        </footer>
+    </div>
+
+    <script>
+    (function() {
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const p1El = document.getElementById('p1');
+        const p2El = document.getElementById('p2');
+        const modeEl = document.getElementById('mode');
+        const toast = document.getElementById('toast');
+        const restartBtn = document.getElementById('restart');
+
+        const W = canvas.width;
+        const H = canvas.height;
+        const SCALE = Math.round(Math.min(W, H) / 115); // pixel scale for paddles/ball
+
+        // Game objects
+        const paddle = {
+            w: 3 * SCALE,
+            h: 18 * SCALE,
+            speed: 0.32 * H,
+        };
+        const ballBaseSpeed = 0.26 * Math.min(W, H);
+
+        function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+        function rnd(min, max) { return Math.random() * (max - min) + min; }
+
+        let state;
+        function reset(hard = false) {
+            state = {
+                t: performance.now(),
+                dt: 0,
+                p1y: (H - paddle.h) / 2,
+                p2y: (H - paddle.h) / 2,
+                b: { x: W / 2, y: H / 2, vx: 0, vy: 0, r: 2.2 * SCALE },
+                hold: true,
+                score1: hard ? 0 : (state?.score1 || 0),
+                score2: hard ? 0 : (state?.score2 || 0),
+                spin: 0,
+                mode: 'Classic',
+            };
+            modeEl.textContent = state.mode;
+            p1El.textContent = state.score1;
+            p2El.textContent = state.score2;
+            toast.style.opacity = 1;
+            setTimeout(() => toast.style.opacity = 0, 2000);
+        }
+
+        reset(true);
+
+        // Input
+        const input = { up: false, down: false };
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') input.up = true;
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') input.down = true;
+            if (state.hold && (input.up || input.down)) serve();
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') input.up = false;
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') input.down = false;
+        });
+
+        restartBtn.addEventListener('click', () => reset(true));
+
+        function serve(toLeft = Math.random() < 0.5) {
+            const angle = rnd(-0.35, 0.35); // radians, keep mostly horizontal
+            const speed = ballBaseSpeed * rnd(0.92, 1.08);
+            state.b.vx = (toLeft ? -1 : 1) * speed * Math.cos(angle);
+            state.b.vy = speed * Math.sin(angle);
+            state.hold = false;
+        }
+
+        // AI simple tracking with smoothing
+        function aiUpdate(dt) {
+            const targetY = state.b.y - paddle.h / 2;
+            const diff = targetY - state.p2y;
+            const maxStep = paddle.speed * dt * 0.9; // a bit slower than player
+            state.p2y += clamp(diff, -maxStep, maxStep);
+            state.p2y = clamp(state.p2y, 0, H - paddle.h);
+        }
+
+        function physics(dt) {
+            // Player movement
+            let py = state.p1y;
+            if (input.up) py -= paddle.speed * dt;
+            if (input.down) py += paddle.speed * dt;
+            state.p1y = clamp(py, 0, H - paddle.h);
+
+            if (state.hold) return; // ball not served yet
+
+            // Ball movement
+            state.b.x += state.b.vx * dt;
+            state.b.y += state.b.vy * dt;
+
+            // Wall collisions
+            if (state.b.y - state.b.r < 0) { state.b.y = state.b.r; state.b.vy *= -1; }
+            if (state.b.y + state.b.r > H) { state.b.y = H - state.b.r; state.b.vy *= -1; }
+
+            // Paddle collisions
+            // Left paddle
+            if (state.b.x - state.b.r < 4 * SCALE + paddle.w &&
+                state.b.x - state.b.r > 4 * SCALE &&
+                state.b.y > state.p1y && state.b.y < state.p1y + paddle.h &&
+                state.b.vx < 0) {
+                state.b.x = 4 * SCALE + paddle.w + state.b.r;
+                state.b.vx *= -1;
+                // add spin based on contact point
+                const hit = (state.b.y - (state.p1y + paddle.h / 2)) / (paddle.h / 2);
+                state.b.vy += hit * ballBaseSpeed * 0.35;
+            }
+
+            // Right paddle (AI)
+            if (state.b.x + state.b.r > W - 4 * SCALE - paddle.w &&
+                state.b.x + state.b.r < W - 4 * SCALE &&
+                state.b.y > state.p2y && state.b.y < state.p2y + paddle.h &&
+                state.b.vx > 0) {
+                state.b.x = W - 4 * SCALE - paddle.w - state.b.r;
+                state.b.vx *= -1;
+                const hit = (state.b.y - (state.p2y + paddle.h / 2)) / (paddle.h / 2);
+                state.b.vy += hit * ballBaseSpeed * 0.35;
+            }
+
+            // Scoring
+            if (state.b.x < -20) { // right scores
+                state.score2++;
+                p2El.textContent = state.score2;
+                reset(false);
+            }
+            if (state.b.x > W + 20) { // left scores
+                state.score1++;
+                p1El.textContent = state.score1;
+                reset(false);
+            }
+
+            // AI update after ball move for responsiveness
+            aiUpdate(dt);
+        }
+
+        function draw() {
+            // Clear
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, W, H);
+
+            // Net is CSS, draw paddles and ball only
+            ctx.fillStyle = '#ffffff';
+
+            // Left paddle
+            ctx.fillRect(4 * SCALE, Math.round(state.p1y), paddle.w, paddle.h);
+            // Right paddle
+            ctx.fillRect(W - 4 * SCALE - paddle.w, Math.round(state.p2y), paddle.w, paddle.h);
+
+            // Ball
+            ctx.fillRect(Math.round(state.b.x - state.b.r), Math.round(state.b.y - state.b.r), Math.round(state.b.r * 2), Math.round(state.b.r * 2));
+
+            // Serve indicator
+            if (state.hold) {
+                ctx.globalAlpha = 0.7;
+                ctx.strokeStyle = '#ffffff';
+                ctx.setLineDash([2, 3]);
+                ctx.strokeRect(W/2 - 26, H/2 - 10, 52, 20);
+                ctx.setLineDash([]);
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        function loop(ts) {
+            const dt = Math.min(0.033, (ts - state.t) / 1000); // clamp delta
+            state.dt = dt;
+            state.t = ts;
+
+            physics(dt);
+            draw();
+            requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+    })();
+    </script>
+</body>
+</html>
