@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whack‑a‑Mole</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, Helvetica, sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .wrap {
+            width: min(92vw, 900px);
+            padding: 28px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+            backdrop-filter: blur(12px);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .title {
+            font-size: clamp(22px, 3.6vw, 36px);
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            text-shadow: 2px 2px 10px rgba(0,0,0,0.25);
+        }
+
+        .panel {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 2px solid rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.15);
+            font-weight: 700;
+            text-shadow: 1px 1px 4px rgba(0,0,0,0.25);
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 16px;
+            border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.7);
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-shadow: 1px 1px 4px rgba(0,0,0,0.25);
+        }
+        .btn:hover { background: rgba(255,255,255,0.28); transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+        .btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+
+        .modes {
+            display: inline-flex;
+            gap: 8px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 12px;
+            padding: 6px;
+        }
+        .mode {
+            border: 2px solid rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.15);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-weight: 800;
+            transition: all 0.2s ease;
+        }
+        .mode.active { background: rgba(255,255,255,0.34); }
+
+        .board {
+            margin-top: 18px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+            width: 100%;
+            aspect-ratio: 3 / 2;
+        }
+
+        .hole {
+            position: relative;
+            background: rgba(0,0,0,0.12);
+            border: 2px solid rgba(255,255,255,0.35);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: inset 0 -16px 30px rgba(0,0,0,0.25), inset 0 8px 18px rgba(255,255,255,0.08);
+        }
+        .hole::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            bottom: 10px;
+            transform: translateX(-50%);
+            width: 70%;
+            height: 14px;
+            border-radius: 999px;
+            background: radial-gradient(ellipse at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.05) 70%);
+            filter: blur(2px);
+        }
+
+        .mole {
+            position: absolute;
+            left: 50%;
+            bottom: -140px;
+            transform: translateX(-50%);
+            width: min(120px, 22vw);
+            height: min(120px, 22vw);
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.7), rgba(255,255,255,0.45) 25%, rgba(255,255,255,0.22) 55%, rgba(255,255,255,0.15) 70%, rgba(255,255,255,0.08) 100%);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.35), inset 0 0 40px rgba(0,0,0,0.15);
+            transition: bottom 140ms ease-out, filter 120ms ease;
+            cursor: crosshair;
+            user-select: none;
+        }
+        .mole.up { bottom: 35px; }
+        .mole.hit { filter: brightness(1.6) saturate(1.1); }
+
+        .footer {
+            margin-top: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+        .hint { opacity: 0.9; font-weight: 700; }
+
+        .toast {
+            position: fixed;
+            right: 22px;
+            bottom: 22px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            background: rgba(0,0,0,0.35);
+            border: 2px solid rgba(255,255,255,0.45);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 220ms ease;
+            pointer-events: none;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+
+        @media (max-width: 640px) {
+            .board { gap: 12px; }
+            .mole.up { bottom: 22px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="header">
+            <div class="title">Whack‑a‑Mole</div>
+            <div class="panel">
+                <div class="chip" id="scoreChip">Score: <span id="score">0</span></div>
+                <div class="chip">Time: <span id="time">60</span>s</div>
+                <div class="modes" role="group" aria-label="Difficulty">
+                    <button class="mode active" data-mode="easy">Easy</button>
+                    <button class="mode" data-mode="medium">Medium</button>
+                    <button class="mode" data-mode="hard">Hard</button>
+                </div>
+                <div class="controls">
+                    <button class="btn" id="startBtn">Start</button>
+                    <button class="btn" id="pauseBtn" disabled>Pause</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="board" id="board">
+            <div class="hole"><div class="mole"></div></div>
+            <div class="hole"><div class="mole"></div></div>
+            <div class="hole"><div class="mole"></div></div>
+            <div class="hole"><div class="mole"></div></div>
+            <div class="hole"><div class="mole"></div></div>
+            <div class="hole"><div class="mole"></div></div>
+            <div class="hole"><div class="mole"></div></div>
+            <div class="hole"><div class="mole"></div></div>
+            <div class="hole"><div class="mole"></div></div>
+        </div>
+
+        <div class="footer">
+            <div class="hint">Hint: Try a famous code… ↑↑↓↓←→←→BA</div>
+            <div class="chip" id="modeChip">Mode: <span id="modeLabel">Easy</span></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">FRENZY MODE!</div>
+
+    <script>
+        const scoreEl = document.getElementById('score');
+        const timeEl = document.getElementById('time');
+        const modeLabel = document.getElementById('modeLabel');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const modeBtns = Array.from(document.querySelectorAll('.mode'));
+        const board = document.getElementById('board');
+        const holes = Array.from(document.querySelectorAll('.hole'));
+        const moles = Array.from(document.querySelectorAll('.mole'));
+        const toast = document.getElementById('toast');
+
+        const modes = {
+            easy:   { minDelay: 550, maxDelay: 950, upMin: 800, upMax: 1100 },
+            medium: { minDelay: 420, maxDelay: 820, upMin: 650, upMax: 900 },
+            hard:   { minDelay: 300, maxDelay: 700, upMin: 520, upMax: 740 },
+        };
+
+        const state = {
+            running: false,
+            paused: false,
+            remaining: 60,
+            score: 0,
+            mode: 'easy',
+            timers: new Set(),
+            lastHole: null,
+            frenzy: false,
+            frenzyUntil: 0,
+        };
+
+        function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+        function chooseHole() {
+            if (holes.length === 0) return null;
+            let idx = rand(0, holes.length - 1);
+            // Avoid the same hole consecutively when possible
+            if (holes.length > 1 && holes[idx] === state.lastHole) {
+                idx = (idx + 1) % holes.length;
+            }
+            const hole = holes[idx];
+            state.lastHole = hole;
+            return hole;
+        }
+
+        function setMode(newMode) {
+            state.mode = newMode;
+            modeLabel.textContent = newMode[0].toUpperCase() + newMode.slice(1);
+            modeBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === newMode));
+        }
+
+        modeBtns.forEach(btn => btn.addEventListener('click', () => setMode(btn.dataset.mode)));
+
+        function resetGame() {
+            // Clear timers
+            state.timers.forEach(id => clearTimeout(id));
+            state.timers.clear();
+            // Reset numbers
+            state.running = false;
+            state.paused = false;
+            state.remaining = 60;
+            state.score = 0;
+            state.frenzy = false;
+            state.frenzyUntil = 0;
+            scoreEl.textContent = state.score;
+            timeEl.textContent = state.remaining;
+            // Hide any moles
+            moles.forEach(m => m.classList.remove('up', 'hit'));
+            // Buttons
+            pauseBtn.disabled = true;
+            startBtn.disabled = false;
+            startBtn.textContent = 'Start';
+        }
+
+        function showToast(msg) {
+            toast.textContent = msg;
+            toast.classList.add('show');
+            const id = setTimeout(() => toast.classList.remove('show'), 1400);
+            state.timers.add(id);
+        }
+
+        function startGame() {
+            if (state.running && state.paused) {
+                // resume
+                state.paused = false;
+                pauseBtn.textContent = 'Pause';
+                tick();
+                spawnLoop();
+                return;
+            }
+            if (state.running) return; // already running
+            resetGame();
+            state.running = true;
+            pauseBtn.disabled = false;
+            startBtn.disabled = true;
+            tick();
+            spawnLoop();
+        }
+
+        function pauseGame() {
+            if (!state.running) return;
+            state.paused = !state.paused;
+            pauseBtn.textContent = state.paused ? 'Resume' : 'Pause';
+            if (state.paused) {
+                // stop all timers
+                state.timers.forEach(id => clearTimeout(id));
+                state.timers.clear();
+            } else {
+                tick();
+                spawnLoop();
+            }
+        }
+
+        function endGame() {
+            state.running = false;
+            state.paused = false;
+            // stop timers
+            state.timers.forEach(id => clearTimeout(id));
+            state.timers.clear();
+            // buttons
+            startBtn.disabled = false;
+            startBtn.textContent = 'Restart';
+            pauseBtn.disabled = true;
+            showToast('Time\'s up!');
+        }
+
+        function tick() {
+            if (!state.running || state.paused) return;
+            const id = setTimeout(() => {
+                state.remaining -= 1;
+                timeEl.textContent = state.remaining;
+                if (state.remaining <= 0) {
+                    endGame();
+                } else {
+                    tick();
+                }
+            }, 1000);
+            state.timers.add(id);
+        }
+
+        function spawnOnce() {
+            const conf = modes[state.mode];
+            const hole = chooseHole();
+            if (!hole) return;
+            const mole = hole.querySelector('.mole');
+            const now = Date.now();
+            const frenzyActive = state.frenzy && now < state.frenzyUntil;
+            if (!frenzyActive && state.frenzy && now >= state.frenzyUntil) {
+                state.frenzy = false;
+            }
+
+            // pop up
+            mole.classList.add('up');
+            mole.classList.remove('hit');
+
+            // hide after up time
+            const upTime = rand(conf.upMin, conf.upMax) * (frenzyActive ? 0.7 : 1);
+            const hideId = setTimeout(() => {
+                mole.classList.remove('up');
+            }, upTime);
+            state.timers.add(hideId);
+        }
+
+        function spawnLoop() {
+            if (!state.running || state.paused) return;
+            const conf = modes[state.mode];
+            const now = Date.now();
+            const frenzyActive = state.frenzy && now < state.frenzyUntil;
+            if (!frenzyActive && state.frenzy && now >= state.frenzyUntil) state.frenzy = false;
+
+            const spawnCount = frenzyActive ? 2 : 1;
+            for (let i = 0; i < spawnCount; i++) spawnOnce();
+
+            const delay = rand(conf.minDelay, conf.maxDelay) * (frenzyActive ? 0.6 : 1);
+            const id = setTimeout(spawnLoop, delay);
+            state.timers.add(id);
+        }
+
+        moles.forEach(mole => {
+            const hit = () => {
+                if (!state.running || state.paused) return;
+                if (!mole.classList.contains('up')) return;
+                mole.classList.remove('up');
+                mole.classList.add('hit');
+                // score
+                const bonus = state.frenzy ? 2 : 1;
+                state.score += bonus;
+                scoreEl.textContent = state.score;
+                // small visual feedback timeout
+                const id = setTimeout(() => mole.classList.remove('hit'), 160);
+                state.timers.add(id);
+            };
+            mole.addEventListener('click', hit);
+            mole.addEventListener('touchstart', (e) => { e.preventDefault(); hit(); }, { passive: false });
+        });
+
+        startBtn.addEventListener('click', startGame);
+        pauseBtn.addEventListener('click', pauseGame);
+
+        // Konami code easter egg: ↑↑↓↓←→←→BA
+        const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+        let konamiIdx = 0;
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+            if (key === KONAMI[konamiIdx] || key === KONAMI[konamiIdx].toLowerCase()) {
+                konamiIdx++;
+                if (konamiIdx >= KONAMI.length) {
+                    konamiIdx = 0;
+                    // Activate frenzy for 10s
+                    state.frenzy = true;
+                    state.frenzyUntil = Date.now() + 10000;
+                    showToast('FRENZY MODE!');
+                    // If paused, resume spawning visuals once game resumes
+                }
+            } else {
+                konamiIdx = 0;
+            }
+        });
+
+        // Initialize view
+        resetGame();
+    </script>
+</body>
+</html>
+
